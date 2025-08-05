@@ -5,12 +5,59 @@ from .exceptions import ValidationError
 
 
 def validate_email_address(email: str) -> bool:
-    """Validate email address format"""
+    """Validate email address format with international domain support"""
     if not email or not isinstance(email, str):
         return False
     
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
+    # More flexible pattern that supports international domains
+    # Split into local and domain parts for separate validation
+    if '@' not in email:
+        return False
+    
+    local_part, domain_part = email.rsplit('@', 1)
+    
+    # Validate local part (before @)
+    # Allow ASCII characters and common symbols, but not international characters in local part
+    # This follows RFC 5321 more closely
+    if not local_part or len(local_part) > 64:
+        return False
+    
+    # Check for valid characters in local part (ASCII only for now)
+    # Allow letters, numbers, and common symbols
+    valid_local_chars = re.match(r'^[a-zA-Z0-9._%+-]+$', local_part)
+    if not valid_local_chars:
+        return False
+    
+    # Basic validation: no consecutive dots, no start/end with dot
+    if local_part.startswith('.') or local_part.endswith('.') or '..' in local_part:
+        return False
+    
+    # Validate domain part (after @)
+    if not domain_part or len(domain_part) > 255:
+        return False
+    
+    # Domain should have at least one dot and valid structure
+    if '.' not in domain_part:
+        return False
+    
+    # Split domain into parts
+    domain_parts = domain_part.split('.')
+    if len(domain_parts) < 2:
+        return False
+    
+    # Each domain part should not be empty and should have reasonable length
+    for part in domain_parts:
+        if not part or len(part) > 63:
+            return False
+        # Allow international characters in domain names (IDN support)
+        if not re.match(r'^[a-zA-Z0-9\u00a1-\uffff-]+$', part):
+            return False
+    
+    # TLD should be at least 2 characters (but allow international TLDs)
+    if len(domain_parts[-1]) < 2:
+        return False
+    
+    return True
 
 
 def validate_email_list(email_list: str) -> tuple[bool, str]:

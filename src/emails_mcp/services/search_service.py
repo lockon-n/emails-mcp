@@ -44,13 +44,38 @@ class SearchService:
                     logging.warning(f"UTF-8 charset search failed: {search_error}")
                     status = 'NO'
                 
-                # Fallback to ASCII if UTF-8 fails
+                # Improved fallback strategy for Chinese content
                 if status != 'OK':
-                    ascii_sender = sender.encode('ascii', errors='ignore').decode('ascii')
-                    if ascii_sender.strip():
-                        status, email_ids = self.imap_backend.connection.search(None, f'FROM "{ascii_sender}"')
-                    else:
-                        return []
+                    # Try different search approaches for Chinese content
+                    search_attempts = [
+                        # Try searching with quoted sender name only (no special chars)
+                        f'FROM "{sender}"',
+                        # Try without quotes
+                        f'FROM {sender}',
+                        # Try with partial email if contains @
+                        f'FROM "{sender.split("@")[0]}"' if '@' in sender else None,
+                        # Try domain search if email
+                        f'FROM "@{sender.split("@")[1]}"' if '@' in sender else None
+                    ]
+                    
+                    for attempt in search_attempts:
+                        if attempt is None:
+                            continue
+                        try:
+                            status, email_ids = self.imap_backend.connection.search(None, attempt)
+                            if status == 'OK' and email_ids[0]:
+                                break
+                        except:
+                            continue
+                    
+                    # Final ASCII fallback only if all above failed
+                    if status != 'OK':
+                        ascii_sender = sender.encode('ascii', errors='ignore').decode('ascii')
+                        if ascii_sender.strip():
+                            status, email_ids = self.imap_backend.connection.search(None, f'FROM "{ascii_sender}"')
+                        else:
+                            # Return empty if we can't search at all
+                            return []
             
             if status != 'OK':
                 raise EmailMCPError(f"Search failed: {status}")
@@ -86,13 +111,38 @@ class SearchService:
                     logging.warning(f"UTF-8 charset search failed: {search_error}")
                     status = 'NO'
                 
-                # Fallback to ASCII if UTF-8 fails
+                # Improved fallback strategy for Chinese subject search
                 if status != 'OK':
-                    ascii_subject = subject.encode('ascii', errors='ignore').decode('ascii')
-                    if ascii_subject.strip():
-                        status, email_ids = self.imap_backend.connection.search(None, f'SUBJECT "{ascii_subject}"')
-                    else:
-                        return []
+                    # Try different search approaches for Chinese subjects
+                    search_attempts = [
+                        # Try searching with quoted subject
+                        f'SUBJECT "{subject}"',
+                        # Try without quotes  
+                        f'SUBJECT {subject}',
+                        # Try partial subject search (first 10 chars)
+                        f'SUBJECT "{subject[:10]}"' if len(subject) > 10 else None,
+                        # Try partial subject search (last 10 chars)  
+                        f'SUBJECT "{subject[-10:]}"' if len(subject) > 10 else None
+                    ]
+                    
+                    for attempt in search_attempts:
+                        if attempt is None:
+                            continue
+                        try:
+                            status, email_ids = self.imap_backend.connection.search(None, attempt)
+                            if status == 'OK' and email_ids[0]:
+                                break
+                        except:
+                            continue
+                    
+                    # Final ASCII fallback only if all above failed
+                    if status != 'OK':
+                        ascii_subject = subject.encode('ascii', errors='ignore').decode('ascii')
+                        if ascii_subject.strip():
+                            status, email_ids = self.imap_backend.connection.search(None, f'SUBJECT "{ascii_subject}"')
+                        else:
+                            # Return empty if we can't search at all
+                            return []
             
             if status != 'OK':
                 raise EmailMCPError(f"Search failed: {status}")

@@ -306,21 +306,34 @@ def register_management_tools(mcp: FastMCP, draft_service: DraftService, email_s
                         import_folder = target_folder or "INBOX"
                     
                     # Ensure target folder exists and is accessible
+                    folder_created = False
                     try:
                         email_service.imap_backend.select_folder(import_folder)
                     except Exception as e:
                         # If folder doesn't exist, try to create it
-                        if preserve_folders and email_obj.folder and email_obj.folder != "INBOX":
+                        if preserve_folders and email_obj.folder and email_obj.folder not in ["INBOX", "SENT", "DRAFTS", "TRASH"]:
                             try:
                                 from ..services.folder_service import FolderService
                                 folder_service = FolderService(email_service.imap_backend)
-                                folder_service.create_folder(import_folder)
-                                print(f"Created folder: {import_folder}")
+                                
+                                # Create folder and all necessary parent folders
+                                success = folder_service.create_folder(import_folder)
+                                if success:
+                                    folder_created = True
+                                    print(f"Created folder: {import_folder}")
+                                    # Re-select the newly created folder
+                                    email_service.imap_backend.select_folder(import_folder)
+                                else:
+                                    raise Exception("Failed to create folder")
+                                    
                             except Exception as create_error:
-                                failed_count += 1
-                                failed_reasons.append(f"Email {email_obj.email_id}: Cannot access or create folder '{import_folder}': {str(create_error)}")
-                                continue
+                                # If can't create custom folder, fall back to INBOX
+                                print(f"Warning: Cannot create folder '{import_folder}': {str(create_error)}")
+                                print(f"Importing email {email_obj.email_id} to INBOX instead")
+                                import_folder = "INBOX"
+                                email_service.imap_backend.select_folder(import_folder)
                         else:
+                            # For system folders or when preserve_folders=False, fail if can't access
                             failed_count += 1
                             failed_reasons.append(f"Email {email_obj.email_id}: Cannot access folder '{import_folder}': {str(e)}")
                             continue

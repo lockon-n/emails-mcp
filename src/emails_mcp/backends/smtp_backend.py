@@ -128,11 +128,17 @@ class SMTPBackend:
                     html_part = MIMEText(html_body, 'html', 'utf-8')
                     msg.attach(html_part)
             
-            # Set headers
-            msg['Subject'] = subject
-            # Format From header with name if provided
+            # Set headers with proper Chinese encoding
+            from email.header import Header
+            
+            # Encode subject for Chinese characters
+            msg['Subject'] = Header(subject, 'utf-8')
+            
+            # Format From header with name if provided, with Chinese support
             if self.config.name:
-                msg['From'] = formataddr((self.config.name, self.config.email))
+                # Encode name for Chinese characters
+                encoded_name = Header(self.config.name, 'utf-8')
+                msg['From'] = formataddr((str(encoded_name), self.config.email))
             else:
                 msg['From'] = self.config.email
             msg['To'] = to

@@ -49,7 +49,7 @@ class FileBackend:
             raise ValidationError(f"Export failed: {str(e)}")
     
     def import_emails(self, import_path: str) -> List[EmailMessage]:
-        """Import emails from file"""
+        """Import emails from file with time-based sorting (newest first)"""
         
         # Validate import path
         valid, error = validate_file_path(import_path, must_exist=True)
@@ -59,17 +59,43 @@ class FileBackend:
         try:
             import_file = Path(import_path)
             
+            emails = []
             if import_file.suffix.lower() == '.json':
-                return self._import_from_json(import_file)
+                emails = self._import_from_json(import_file)
             elif import_file.suffix.lower() == '.eml':
-                return self._import_from_eml(import_file)
+                emails = self._import_from_eml(import_file)
             elif import_file.is_dir():
-                return self._import_from_directory(import_file)
+                emails = self._import_from_directory(import_file)
             else:
                 raise ValidationError(f"Unsupported import format: {import_file.suffix}")
+            
+            # Sort emails by date (newest first) for consistent import order
+            emails.sort(key=lambda email: self._parse_email_date(email.date), reverse=True)
+            
+            return emails
                 
         except Exception as e:
             raise ValidationError(f"Import failed: {str(e)}")
+    
+    def _parse_email_date(self, date_str: str) -> datetime:
+        """Parse email date string to datetime object for sorting"""
+        if not date_str:
+            return datetime.min.replace(tzinfo=None)  # Put emails without dates at the end
+        
+        try:
+            from email.utils import parsedate_to_datetime
+            parsed_date = parsedate_to_datetime(date_str)
+            
+            # Convert to naive datetime for consistent comparison
+            if parsed_date.tzinfo is not None:
+                # Convert to UTC and then remove timezone info
+                parsed_date = parsed_date.utctimetuple()
+                parsed_date = datetime(*parsed_date[:6])
+            
+            return parsed_date
+        except:
+            # Fallback to current time if parsing fails (make it naive)
+            return datetime.now().replace(tzinfo=None)
     
     def _export_to_json(self, emails: List[EmailMessage], export_file: Path):
         """Export emails to JSON format"""
