@@ -291,6 +291,15 @@ def register_management_tools(mcp: FastMCP, draft_service: DraftService, email_s
             if not imported_emails:
                 return f"No emails found in import file {import_path}"
             
+            # 按email_id从大到小排序，确保导入时保持原始顺序
+            # 因为get_emails返回的是newest first，所以ID越大的邮件越新
+            # 倒序导入可以保持原来的头部（最老）和尾部（最新）顺序
+            try:
+                imported_emails.sort(key=lambda x: int(x.email_id) if x.email_id.isdigit() else 0, reverse=True)
+                print(f"Sorted {len(imported_emails)} emails by ID for proper import order")
+            except Exception as e:
+                print(f"Warning: Could not sort emails by ID: {str(e)}, importing in original order")
+            
             # Import emails to IMAP server
             success_count = 0
             failed_count = 0
