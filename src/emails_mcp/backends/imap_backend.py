@@ -97,17 +97,35 @@ class IMAPBackend:
             logging.warning(f"Could not check/enable UTF-8 support: {str(e)}")
             self.utf8_enabled = False
     
+    def _quote_folder_name(self, folder_name: str) -> str:
+        """Quote folder name if it contains spaces (excluding leading/trailing spaces)"""
+        # Strip leading/trailing spaces first
+        folder_name = folder_name.strip()
+        
+        # Check if there are spaces in the middle of the folder name
+        if ' ' in folder_name:
+            # Escape any existing quotes in the folder name
+            folder_name = folder_name.replace('"', '\\"')
+            # Wrap with quotes
+            return f'"{folder_name}"'
+        
+        return folder_name
+
     def select_folder(self, folder: str) -> Tuple[int, int]:
         """Select email folder and return (total_messages, unread_messages)"""
         self.ensure_connected()
-        
+        logging.info(f"尝试选中文件夹: {folder}")
         try:
-            status, data = self.connection.select(folder)
+            # Quote folder name if necessary
+            encoded_folder_name = self._encode_folder_name(folder)
+            
+            status, data = self.connection.select(encoded_folder_name)
             if status != 'OK':
                 raise FolderError(f"Failed to select folder '{folder}': {status}")
             
-            self.current_folder = folder
-            total_messages = int(data[0]) if data[0] else 0
+            self.current_folder = folder  # Store the original folder name without quotes
+            total_messages = int(
+                data[0]) if data[0] else 0
             
             # Get unread count
             status, unread_data = self.connection.search(None, 'UNSEEN')
@@ -139,7 +157,11 @@ class IMAPBackend:
                 folder_name = None
                 if len(parts) >= 3:
                     # If folder name is quoted: '(flags) "sep" "name"'
-                    folder_name = parts[-1] if parts[-1] else parts[-2]
+                    # The folder name is typically the last quoted part (parts[3] if exists, otherwise parts[2])
+                    if len(parts) >= 4 and parts[3].strip():
+                        folder_name = parts[3].strip()
+                    elif len(parts) >= 3 and parts[2].strip() and parts[2].strip() not in ['.', '/', '\\']:
+                        folder_name = parts[2].strip()
                 else:
                     # If folder name is not quoted: '(flags) "sep" name'
                     # Split by spaces and take the last part
@@ -477,7 +499,7 @@ class IMAPBackend:
             logging.error(f"Error moving email {email_id} to {target_folder}: {str(e)}")
             raise FolderError(f"Failed to move email: {str(e)}")
     
-    def _encode_folder_name(self, folder_name: str) -> str:
+    def _encode_folder_name_raw(self, folder_name: str) -> str:
         """Encode folder name for IMAP operations with UTF-8 support"""
         try:
             # If UTF-8 is enabled on server, use folder name directly
@@ -497,6 +519,9 @@ class IMAPBackend:
             logging.warning(f"Error encoding folder name '{folder_name}': {str(e)}")
             # Fallback to original name
             return folder_name
+    
+    def _encode_folder_name(self, folder_name: str):
+        return self._quote_folder_name(self._encode_folder_name_raw(folder_name))
     
     def append_message(self, folder: str, message: str, flags: str = '\\Seen') -> bool:
         """Append a message to the specified folder with UTF-8 support"""

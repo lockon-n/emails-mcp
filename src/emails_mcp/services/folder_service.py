@@ -5,12 +5,25 @@ from ..backends.imap_backend import IMAPBackend
 from ..utils.exceptions import EmailMCPError, FolderError
 from ..utils.validators import validate_folder_name
 
-
 class FolderService:
     """Folder management service layer"""
     
     def __init__(self, imap_backend: IMAPBackend):
         self.imap_backend = imap_backend
+    
+    def _quote_folder_name(self, folder_name: str) -> str:
+        """Quote folder name if it contains spaces (excluding leading spaces)"""
+        # Strip leading/trailing spaces first
+        folder_name = folder_name.strip()
+        
+        # Check if there are spaces in the middle of the folder name
+        if ' ' in folder_name:
+            # Escape any existing quotes in the folder name
+            folder_name = folder_name.replace('"', '\\"')
+            # Wrap with quotes
+            return f'"{folder_name}"'
+        
+        return folder_name
     
     def get_folders(self) -> List[EmailFolder]:
         """Get list of all email folders"""
@@ -29,11 +42,14 @@ class FolderService:
         try:
             self.imap_backend.ensure_connected()
             
+            # Quote folder name if it contains spaces
+            quoted_folder_name = self._quote_folder_name(folder_name)
+            
             # Try different folder naming conventions with proper UTF-8 encoding
             folder_names_to_try = [
-                folder_name,  # Direct name
-                f"INBOX.{folder_name}",  # INBOX prefix (common for many servers)
-                f"INBOX/{folder_name}",   # INBOX with slash separator
+                quoted_folder_name,  # Direct name
+                # f"INBOX.{quoted_folder_name}",  # INBOX prefix (common for many servers)
+                # f"INBOX/{quoted_folder_name}",   # INBOX with slash separator
             ]
             
             last_error = None
@@ -57,6 +73,9 @@ class FolderService:
                     
                     if status == 'OK':
                         logging.info(f"Successfully created folder: {fname}")
+                        return True
+                    elif "already exists" in data.lower():
+                        logging.warning(f"Folder '{folder_name}' already exists, skip creating it!")
                         return True
                     else:
                         logging.warning(f"Failed to create folder '{fname}': {status} {data}")
@@ -83,12 +102,16 @@ class FolderService:
         
         # Prevent deletion of system folders
         system_folders = ['INBOX', 'Sent', 'Drafts', 'Trash', 'Spam']
-        if folder_name in system_folders:
+        if folder_name.strip() in system_folders:
             raise FolderError(f"Cannot delete system folder: {folder_name}")
         
         try:
             self.imap_backend.ensure_connected()
-            status, data = self.imap_backend.connection.delete(folder_name)
+            
+            # Quote folder name if it contains spaces
+            quoted_folder_name = self._quote_folder_name(folder_name)
+            
+            status, data = self.imap_backend.connection.delete(quoted_folder_name)
             
             if status != 'OK':
                 raise FolderError(f"Failed to delete folder '{folder_name}': {status}")
@@ -101,6 +124,7 @@ class FolderService:
     def get_folder_stats(self, folder_name: str) -> MailboxStats:
         """Get statistics for specific folder"""
         try:
+            # Note: select_folder in imap_backend should handle quoting internally
             total_messages, unread_messages = self.imap_backend.select_folder(folder_name)
             
             return MailboxStats(
