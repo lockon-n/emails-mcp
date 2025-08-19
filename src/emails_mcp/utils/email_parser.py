@@ -266,6 +266,9 @@ def parse_raw_email(raw_email: bytes, email_id: str) -> EmailMessage:
             message_id=message_id
         )
         
+        # Store the raw message for attachment extraction
+        email_msg.raw_message = msg
+        
         # Add extra metadata for Chinese support
         if hasattr(email_msg, '__dict__'):
             email_msg.__dict__['from_display_name'] = from_display_name

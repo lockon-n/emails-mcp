@@ -431,13 +431,12 @@ def register_management_tools(mcp: FastMCP, draft_service: DraftService, email_s
             return f"Error importing emails: {str(e)}"
     
     @mcp.tool()
-    async def download_attachment(email_id: str, attachment_filename: str, download_path: str) -> str:
-        """Download email attachment to specified path
+    async def download_attachment(email_id: str, attachment_filename: str) -> str:
+        """Download email attachment to configured download path
         
         Args:
             email_id: Email ID containing the attachment
             attachment_filename: Name of attachment to download
-            download_path: Directory path where to save the attachment
         """
         try:
             email = email_service.imap_backend.fetch_email(email_id)
