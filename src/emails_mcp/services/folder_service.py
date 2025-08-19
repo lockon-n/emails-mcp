@@ -4,6 +4,7 @@ from ..models.email import EmailFolder, MailboxStats
 from ..backends.imap_backend import IMAPBackend
 from ..utils.exceptions import EmailMCPError, FolderError
 from ..utils.validators import validate_folder_name
+from ..utils.encode_decode import encode_to_imap_utf7
 
 class FolderService:
     """Folder management service layer"""
@@ -43,47 +44,42 @@ class FolderService:
             self.imap_backend.ensure_connected()
             
             # Quote folder name if it contains spaces
+
             quoted_folder_name = self._quote_folder_name(folder_name)
-            
-            # Try different folder naming conventions with proper UTF-8 encoding
-            folder_names_to_try = [
-                quoted_folder_name,  # Direct name
-                # f"INBOX.{quoted_folder_name}",  # INBOX prefix (common for many servers)
-                # f"INBOX/{quoted_folder_name}",   # INBOX with slash separator
-            ]
-            
+
+            utf7_quoted_folder_name = encode_to_imap_utf7(quoted_folder_name)
+
             last_error = None
-            for fname in folder_names_to_try:
-                try:
-                    logging.info(f"Trying to create folder: {fname}")
+
+            try:
+                logging.info(f"Trying to create folder: {folder_name}")
+                
+                # Handle UTF-8 encoding for Chinese/Unicode folder names
+                if self.imap_backend.utf8_enabled:
+                    # Server supports UTF-8, send as UTF-8
+                    status, data = self.imap_backend.connection.create(quoted_folder_name)
+                else:
+                    # For servers without UTF-8 support, try different encodings
+                    try:
+                        # Try UTF-7 encoding (IMAP standard for non-ASCII)
+                        status, data = self.imap_backend.connection.create(utf7_quoted_folder_name)
+                    except UnicodeError:
+                        # If UTF-7 fails, try direct UTF-8
+                        status, data = self.imap_backend.connection.create(quoted_folder_name.encode('utf-8'))
+                
+                if status == 'OK':
+                    logging.info(f"Successfully created folder: {folder_name}")
+                    return True
+                elif "already exists" in data.lower():
+                    logging.warning(f"Folder '{folder_name}' already exists, skip creating it!")
+                    return True
+                else:
+                    logging.warning(f"Failed to create folder '{folder_name}': {status} {data}")
+                    last_error = f"Server returned: {status} {data}"
                     
-                    # Handle UTF-8 encoding for Chinese/Unicode folder names
-                    if self.imap_backend.utf8_enabled:
-                        # Server supports UTF-8, send as UTF-8
-                        status, data = self.imap_backend.connection.create(fname)
-                    else:
-                        # For servers without UTF-8 support, try different encodings
-                        try:
-                            # Try UTF-7 encoding (IMAP standard for non-ASCII)
-                            utf7_fname = fname.encode('utf-7').decode('ascii')
-                            status, data = self.imap_backend.connection.create(utf7_fname)
-                        except UnicodeError:
-                            # If UTF-7 fails, try direct UTF-8
-                            status, data = self.imap_backend.connection.create(fname.encode('utf-8'))
-                    
-                    if status == 'OK':
-                        logging.info(f"Successfully created folder: {fname}")
-                        return True
-                    elif "already exists" in data.lower():
-                        logging.warning(f"Folder '{folder_name}' already exists, skip creating it!")
-                        return True
-                    else:
-                        logging.warning(f"Failed to create folder '{fname}': {status} {data}")
-                        last_error = f"Server returned: {status} {data}"
-                        
-                except Exception as e:
-                    logging.warning(f"Exception creating folder '{fname}': {e}")
-                    last_error = str(e)
+            except Exception as e:
+                logging.warning(f"Exception creating folder '{folder_name}': {e}")
+                last_error = str(e)
             
             # If all attempts failed
             raise FolderError(f"Failed to create folder '{folder_name}' with any naming convention. Last error: {last_error}")
@@ -110,8 +106,12 @@ class FolderService:
             
             # Quote folder name if it contains spaces
             quoted_folder_name = self._quote_folder_name(folder_name)
+            utf7_quoted_folder_name = encode_to_imap_utf7(quoted_folder_name)
             
-            status, data = self.imap_backend.connection.delete(quoted_folder_name)
+            if self.imap_backend.utf8_enabled:
+                status, data = self.imap_backend.connection.delete(quoted_folder_name)
+            else:
+                status, data = self.imap_backend.connection.delete(utf7_quoted_folder_name)
             
             if status != 'OK':
                 raise FolderError(f"Failed to delete folder '{folder_name}': {status}")
@@ -125,7 +125,13 @@ class FolderService:
         """Get statistics for specific folder"""
         try:
             # Note: select_folder in imap_backend should handle quoting internally
-            total_messages, unread_messages = self.imap_backend.select_folder(folder_name)
+            quoted_folder_name = self._quote_folder_name(folder_name)   
+            utf7_quoted_folder_name = encode_to_imap_utf7(quoted_folder_name)
+
+            if self.imap_backend.utf8_enabled:
+                total_messages, unread_messages = self.imap_backend.select_folder(quoted_folder_name)
+            else:
+                total_messages, unread_messages = self.imap_backend.select_folder(utf7_quoted_folder_name)
             
             return MailboxStats(
                 folder_name=folder_name,
@@ -140,7 +146,13 @@ class FolderService:
         """Get unread message count for folder or all folders"""
         try:
             if folder_name:
-                _, unread_count = self.imap_backend.select_folder(folder_name)
+                quoted_folder_name = self._quote_folder_name(folder_name)
+                utf7_quoted_folder_name = encode_to_imap_utf7(quoted_folder_name)
+
+                if self.imap_backend.utf8_enabled:
+                    _, unread_count = self.imap_backend.select_folder(quoted_folder_name)
+                else:
+                    _, unread_count = self.imap_backend.select_folder(utf7_quoted_folder_name)
                 return unread_count
             else:
                 # Get unread count for all folders

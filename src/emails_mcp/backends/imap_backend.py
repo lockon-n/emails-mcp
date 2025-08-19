@@ -6,7 +6,7 @@ from ..models.config import EmailConfig
 from ..models.email import EmailFolder, EmailMessage
 from ..utils.exceptions import ConnectionError, AuthenticationError, FolderError
 from ..utils.email_parser import parse_raw_email
-
+from ..utils.encode_decode import encode_to_imap_utf7, decode_from_imap_utf7
 
 class IMAPBackend:
     """IMAP backend for email operations"""
@@ -117,9 +117,14 @@ class IMAPBackend:
         logging.info(f"尝试选中文件夹: {folder}")
         try:
             # Quote folder name if necessary
-            encoded_folder_name = self._encode_folder_name(folder)
+            quoted_folder_name = self._quote_folder_name(folder)
+            utf7_quoted_folder_name = encode_to_imap_utf7(quoted_folder_name)
+
+            if self.utf8_enabled:
+                status, data = self.connection.select(quoted_folder_name)  
+            else:
+                status, data = self.connection.select(utf7_quoted_folder_name)
             
-            status, data = self.connection.select(encoded_folder_name)
             if status != 'OK':
                 raise FolderError(f"Failed to select folder '{folder}': {status}")
             
@@ -147,7 +152,10 @@ class IMAPBackend:
             
             folder_list = []
             for folder in folders:
-                folder_info = folder.decode('utf-8')
+                if self.utf8_enabled:
+                    folder_info = folder.decode('utf-8')
+                else:
+                    folder_info = decode_from_imap_utf7(folder.decode('utf-8'))
                 logging.debug(f"Parsing folder info: {folder_info}")
                 
                 # Parse folder name from IMAP response
@@ -208,7 +216,13 @@ class IMAPBackend:
     
     def get_email_ids(self, folder: str, limit: Optional[int] = None) -> List[str]:
         """Get email IDs from folder (newest first)"""
-        total, _ = self.select_folder(folder)
+        quoted_folder_name = self._quote_folder_name(folder)
+        utf7_quoted_folder_name = encode_to_imap_utf7(quoted_folder_name)
+
+        if self.utf8_enabled:
+            total, _ = self.select_folder(quoted_folder_name)
+        else:
+            total, _ = self.select_folder(utf7_quoted_folder_name)
         
         if total == 0:
             return []
@@ -472,10 +486,14 @@ class IMAPBackend:
                 raise FolderError(f"Email {email_id} not found in current folder")
             
             # Handle UTF-8 encoding for target folder name
-            encoded_target_folder = self._encode_folder_name(target_folder)
+            quoted_target_folder = self._quote_folder_name(target_folder)
+            utf7_quoted_target_folder = encode_to_imap_utf7(quoted_target_folder)
             
             # Copy to target folder
-            copy_result = self.connection.copy(email_id, encoded_target_folder)
+            if self.utf8_enabled:
+                copy_result = self.connection.copy(email_id, quoted_target_folder)
+            else:
+                copy_result = self.connection.copy(email_id, utf7_quoted_target_folder)
             if copy_result[0] != 'OK':
                 raise FolderError(f"Failed to copy email to {target_folder}: {copy_result[1]}")
             
@@ -499,40 +517,20 @@ class IMAPBackend:
             logging.error(f"Error moving email {email_id} to {target_folder}: {str(e)}")
             raise FolderError(f"Failed to move email: {str(e)}")
     
-    def _encode_folder_name_raw(self, folder_name: str) -> str:
-        """Encode folder name for IMAP operations with UTF-8 support"""
-        try:
-            # If UTF-8 is enabled on server, use folder name directly
-            if self.utf8_enabled:
-                return folder_name
-            
-            # For non-UTF-8 servers, check if folder name contains non-ASCII characters
-            try:
-                folder_name.encode('ascii')
-                # ASCII only, use as-is
-                return folder_name
-            except UnicodeEncodeError:
-                # Contains non-ASCII characters, encode as UTF-7 (IMAP standard)
-                return folder_name.encode('utf-7').decode('ascii')
-                
-        except Exception as e:
-            logging.warning(f"Error encoding folder name '{folder_name}': {str(e)}")
-            # Fallback to original name
-            return folder_name
-    
-    def _encode_folder_name(self, folder_name: str):
-        return self._quote_folder_name(self._encode_folder_name_raw(folder_name))
-    
     def append_message(self, folder: str, message: str, flags: str = '\\Seen') -> bool:
         """Append a message to the specified folder with UTF-8 support"""
         self.ensure_connected()
         
         try:
             # Encode folder name for IMAP operations
-            encoded_folder = self._encode_folder_name(folder)
+            quoted_folder = self._quote_folder_name(folder)
+            utf7_quoted_folder = encode_to_imap_utf7(quoted_folder)
             
             # Use IMAP APPEND command to add message to folder
-            result = self.connection.append(encoded_folder, flags, None, message.encode('utf-8'))
+            if self.utf8_enabled:
+                result = self.connection.append(quoted_folder, flags, None, message.encode('utf-8'))
+            else:
+                result = self.connection.append(utf7_quoted_folder, flags, None, message.encode('utf-8'))
             if result[0] == 'OK':
                 logging.info(f"Message appended to {folder}")
                 return True
