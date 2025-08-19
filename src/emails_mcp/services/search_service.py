@@ -15,6 +15,9 @@ class SearchService:
     def search_emails_by_query(self, query: str, folder: Optional[str] = None) -> List[str]:
         """Search emails and return email IDs"""
         try:
+            # If no folder specified, use INBOX as default
+            if not folder:
+                folder = 'INBOX'
             return self.imap_backend.search_emails(query, folder)
         except Exception as e:
             raise EmailMCPError(f"Failed to search emails: {str(e)}")
@@ -22,8 +25,12 @@ class SearchService:
     def search_by_sender(self, sender: str, folder: Optional[str] = None) -> List[str]:
         """Search emails by sender"""
         try:
-            if folder:
-                self.imap_backend.select_folder(folder)
+            # If no folder specified, use INBOX as default
+            if not folder:
+                folder = 'INBOX'
+            
+            # Always select folder before searching
+            self.imap_backend.select_folder(folder)
             
             self.imap_backend.ensure_connected()
             
@@ -89,8 +96,12 @@ class SearchService:
     def search_by_subject(self, subject: str, folder: Optional[str] = None) -> List[str]:
         """Search emails by subject"""
         try:
-            if folder:
-                self.imap_backend.select_folder(folder)
+            # If no folder specified, use INBOX as default
+            if not folder:
+                folder = 'INBOX'
+            
+            # Always select folder before searching
+            self.imap_backend.select_folder(folder)
             
             self.imap_backend.ensure_connected()
             
@@ -157,8 +168,12 @@ class SearchService:
                            folder: Optional[str] = None) -> List[str]:
         """Search emails by date range (YYYY-MM-DD format)"""
         try:
-            if folder:
-                self.imap_backend.select_folder(folder)
+            # If no folder specified, use INBOX as default
+            if not folder:
+                folder = 'INBOX'
+            
+            # Always select folder before searching
+            self.imap_backend.select_folder(folder)
             
             self.imap_backend.ensure_connected()
             

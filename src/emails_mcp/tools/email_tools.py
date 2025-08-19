@@ -82,12 +82,12 @@ def register_email_tools(mcp: FastMCP, email_service: EmailService):
             return f"Error reading email: {str(e)}"
     
     @mcp.tool()
-    async def search_emails(query: str, folder: str = None, page: int = 1, page_size: int = 20) -> str:
+    async def search_emails(query: str, folder: str = "INBOX", page: int = 1, page_size: int = 20) -> str:
         """Search emails with query string (sorted by date descending)
         
         Args:
             query: Search query (subject, from, body content)
-            folder: Folder to search in (default: current selected folder)
+            folder: Folder to search in (default: INBOX)
             page: Page number starting from 1 (default: 1)
             page_size: Number of results per page (default: 20)
         """

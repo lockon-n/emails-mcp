@@ -317,10 +317,14 @@ class IMAPBackend:
     
     def search_emails(self, query: str, folder: str = None) -> List[str]:
         """Search emails and return email IDs"""
-        if folder:
-            self.select_folder(folder)
-        
         self.ensure_connected()
+        
+        # If no folder specified, use INBOX as default
+        if not folder:
+            folder = 'INBOX'
+        
+        # Always select folder before searching
+        self.select_folder(folder)
         
         try:
             # Handle Unicode/Chinese characters in search query
