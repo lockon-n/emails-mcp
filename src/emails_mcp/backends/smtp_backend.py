@@ -10,6 +10,7 @@ from typing import List, Optional
 from ..models.config import EmailConfig
 from ..utils.exceptions import ConnectionError, AuthenticationError, SendEmailError
 from ..utils.validators import validate_email_list, validate_file_path
+from ..config.settings import ConfigManager
 
 
 class SMTPBackend:
@@ -194,6 +195,12 @@ class SMTPBackend:
         valid, error = validate_file_path(file_path, must_exist=True)
         if not valid:
             raise SendEmailError(f"Attachment error: {error}")
+        
+        # Validate attachment upload path if configured
+        config_manager = ConfigManager()
+        path_valid, path_error = config_manager.validate_attachment_upload_path(file_path)
+        if not path_valid:
+            raise SendEmailError(f"Attachment path validation failed: {path_error}")
         
         try:
             with open(file_path, 'rb') as f:

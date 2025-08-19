@@ -3,6 +3,37 @@ from mcp.server.fastmcp import FastMCP
 from ..services.draft_service import DraftService
 
 
+def _reconstruct_email_message(email_obj) -> str:
+    """Reconstruct email message from EmailMessage object"""
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.utils import formatdate
+    
+    # Create message
+    if email_obj.body_html:
+        msg = MIMEMultipart('alternative')
+        msg.attach(MIMEText(email_obj.body_text or '', 'plain', 'utf-8'))
+        msg.attach(MIMEText(email_obj.body_html, 'html', 'utf-8'))
+    else:
+        msg = MIMEText(email_obj.body_text or '', 'plain', 'utf-8')
+    
+    # Set headers
+    msg['Subject'] = email_obj.subject or ''
+    msg['From'] = email_obj.from_addr or ''
+    msg['To'] = email_obj.to_addr or ''
+    if email_obj.cc_addr:
+        msg['Cc'] = email_obj.cc_addr
+    if email_obj.bcc_addr:
+        msg['Bcc'] = email_obj.bcc_addr
+    if email_obj.message_id:
+        msg['Message-ID'] = email_obj.message_id
+    if email_obj.date:
+        msg['Date'] = email_obj.date
+    else:
+        msg['Date'] = formatdate(localtime=True)
+    
+    return msg.as_string()
+
 def register_management_tools(mcp: FastMCP, draft_service: DraftService, email_service):
     """Register management and utility MCP tools"""
     
@@ -398,38 +429,6 @@ def register_management_tools(mcp: FastMCP, draft_service: DraftService, email_s
             
         except Exception as e:
             return f"Error importing emails: {str(e)}"
-
-
-def _reconstruct_email_message(email_obj) -> str:
-    """Reconstruct email message from EmailMessage object"""
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from email.utils import formatdate
-    
-    # Create message
-    if email_obj.body_html:
-        msg = MIMEMultipart('alternative')
-        msg.attach(MIMEText(email_obj.body_text or '', 'plain', 'utf-8'))
-        msg.attach(MIMEText(email_obj.body_html, 'html', 'utf-8'))
-    else:
-        msg = MIMEText(email_obj.body_text or '', 'plain', 'utf-8')
-    
-    # Set headers
-    msg['Subject'] = email_obj.subject or ''
-    msg['From'] = email_obj.from_addr or ''
-    msg['To'] = email_obj.to_addr or ''
-    if email_obj.cc_addr:
-        msg['Cc'] = email_obj.cc_addr
-    if email_obj.bcc_addr:
-        msg['Bcc'] = email_obj.bcc_addr
-    if email_obj.message_id:
-        msg['Message-ID'] = email_obj.message_id
-    if email_obj.date:
-        msg['Date'] = email_obj.date
-    else:
-        msg['Date'] = formatdate(localtime=True)
-    
-    return msg.as_string()
     
     @mcp.tool()
     async def download_attachment(email_id: str, attachment_filename: str, download_path: str) -> str:
