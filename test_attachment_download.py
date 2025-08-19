@@ -29,7 +29,7 @@ def test_attachment_download():
     # 初始化配置管理器
     config_manager.load_workspace_config(
         config_file=config_path,
-        attachment_download_path="/tmp/attachments"
+        attachment_download_path="./"
     )
     
     email_config = config_manager.load_email_config(config_path)
@@ -131,7 +131,7 @@ def test_attachment_download():
                 # 保存附件
                 file_backend = FileBackend(
                     email_export_path=None,
-                    attachment_download_path="/tmp/attachments"
+                    attachment_download_path="./"
                 )
                 
                 saved_path = file_backend.save_attachment(attachment_data, test_attachment.filename)
