@@ -1,6 +1,6 @@
 [project]
 name = "emails-mcp"
-version = "0.1.6"
+version = "0.1.7"
 description = "A FastMCP-based email management server for IMAP/SMTP operations"
 readme = "README.md"
 authors = [
