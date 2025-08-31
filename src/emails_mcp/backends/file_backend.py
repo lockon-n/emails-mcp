@@ -69,9 +69,9 @@ class FileBackend:
             else:
                 raise ValidationError(f"Unsupported import format: {import_file.suffix}")
             
-            # Sort emails by date (newest first) for consistent import order
-            emails.sort(key=lambda email: self._parse_email_date(email.date), reverse=True)
-            
+            # Sort emails by email_id (oldest first) for consistent import order
+            emails.sort(key=lambda email: email.email_id, reverse=False)
+
             return emails
                 
         except Exception as e:
