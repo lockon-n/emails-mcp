@@ -9,6 +9,8 @@ from ..utils.exceptions import ValidationError
 from ..utils.validators import validate_file_path
 from ..utils.email_parser import parse_raw_email
 import logging
+from email import encoders
+
 
 class FileBackend:
     """File backend for email import/export operations"""
@@ -238,30 +240,38 @@ class FileBackend:
                     # Add attachments to the message object
                     for att_data in email_data.get('attachments', []):
                         if att_data.get('content'):
-                            content_type = att_data['content_type'].split('/')
-                            part = MIMEBase(content_type[0], content_type[1])
-                            try:
-                                # Decode base64 content for the message part
-                                content = base64.b64decode(att_data['content'])
-                                part.set_payload(content)
-                            except:
-                                # If decoding fails, use empty content
-                                part.set_payload(b'')
+                            content_type_parts = att_data['content_type'].split('/')
+                            if len(content_type_parts) == 2:
+                                maintype, subtype = content_type_parts
+                            else:
+                                maintype, subtype = 'application', 'octet-stream'
                             
-                            # Handle Chinese filename encoding
-                            filename = att_data["filename"]
-                            from email.header import Header
-                            # Encode Chinese filename properly for MIME
+                            part = MIMEBase(maintype, subtype)
+                            
+                            # 方法A：直接使用（推荐）
+                            # 验证 base64 格式但不解码
                             try:
-                                # Check if filename contains non-ASCII characters
+                                # 只验证，不实际解码
+                                base64.b64decode(att_data['content'])
+                                # 如果验证通过，直接使用
+                                part.set_payload(att_data['content'])
+                                part['Content-Transfer-Encoding'] = 'base64'
+                            except Exception as e:
+                                logging.warning(f"Invalid base64 content: {e}")
+                                # 设置空附件
+                                part.set_payload('')
+                                part['Content-Transfer-Encoding'] = 'base64'
+                            
+                            # 处理文件名...
+                            filename = att_data["filename"]
+                            try:
                                 filename.encode('ascii')
-                                # If it's ASCII, use directly
-                                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+                                part.add_header('Content-Disposition', 'attachment',
+                                            filename=filename)
                             except UnicodeEncodeError:
-                                # If it contains non-ASCII, encode it
-                                encoded_filename = Header(filename, 'utf-8').encode()
-                                part.add_header('Content-Disposition', f'attachment; filename={encoded_filename}')
-                            part.add_header('Content-Type', att_data['content_type'])
+                                part.add_header('Content-Disposition', 'attachment',
+                                            filename=('utf-8', '', filename))
+                            
                             msg.attach(part)
                     
                     email_obj.raw_message = msg
