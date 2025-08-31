@@ -135,13 +135,13 @@ def extract_attachments_info(msg: email.message.Message) -> List[EmailAttachment
                 
                 # Get content info
                 content_type = part.get_content_type()
-                logging.debug(f"Filename: {filename}")
-                logging.debug(f"Content type: {content_type}")
+                # logging.debug(f"Filename: {filename}")
+                # logging.debug(f"Content type: {content_type}")
                 payload = part.get_payload(decode=True)
                 size = len(payload) if payload else 0
                 
-                logging.debug(f"Payload: {payload}")
-                logging.debug(f"Size: {size}")
+                # logging.debug(f"Payload: {payload}")
+                # logging.debug(f"Size: {size}")
                 
                 attachment = EmailAttachment(
                     filename=filename,
