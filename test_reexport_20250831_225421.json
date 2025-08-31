@@ -1,0 +1,29 @@
+{
+  "export_date": "2025-08-31T22:54:21.839128",
+  "total_emails": 1,
+  "emails": [
+    {
+      "email_id": "1",
+      "subject": "测试二进制附件",
+      "from_addr": "test@example.com",
+      "to_addr": "recipient@example.com",
+      "cc_addr": null,
+      "bcc_addr": null,
+      "date": null,
+      "message_id": null,
+      "body_text": "测试邮件",
+      "body_html": null,
+      "is_read": false,
+      "is_important": false,
+      "folder": null,
+      "attachments": [
+        {
+          "filename": "test_binary.bin",
+          "content_type": "application/octet-stream",
+          "size": 256,
+          "content": null
+        }
+      ]
+    }
+  ]
+}

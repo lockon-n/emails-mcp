@@ -213,7 +213,6 @@ class FileBackend:
                     from email.mime.multipart import MIMEMultipart
                     from email.mime.base import MIMEBase
                     from email.mime.text import MIMEText
-                    import base64
                     
                     msg = MIMEMultipart()
                     msg['Subject'] = email_data['subject']
