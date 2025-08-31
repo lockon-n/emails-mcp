@@ -326,7 +326,7 @@ def register_management_tools(mcp: FastMCP, draft_service: DraftService, email_s
             # 因为get_emails返回的是newest first，所以ID越大的邮件越新
             # 倒序导入可以保持原来的头部（最老）和尾部（最新）顺序
             try:
-                imported_emails.sort(key=lambda x: int(x.email_id) if x.email_id.isdigit() else 0, reverse=True)
+                imported_emails.sort(key=lambda x: int(x.email_id) if x.email_id.isdigit() else 0, reverse=False)
                 print(f"Sorted {len(imported_emails)} emails by ID for proper import order")
             except Exception as e:
                 print(f"Warning: Could not sort emails by ID: {str(e)}, importing in original order")
