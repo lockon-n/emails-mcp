@@ -238,7 +238,8 @@ class FileBackend:
                     # Add attachments to the message object
                     for att_data in email_data.get('attachments', []):
                         if att_data.get('content'):
-                            part = MIMEBase('application', 'octet-stream')
+                            content_type = att_data['content_type'].split('/')
+                            part = MIMEBase(content_type[0], content_type[1])
                             try:
                                 # Decode base64 content for the message part
                                 content = base64.b64decode(att_data['content'])
