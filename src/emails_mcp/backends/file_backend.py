@@ -172,9 +172,9 @@ class FileBackend:
                     if att_data.get('content'):
                         try:
                             content = base64.b64decode(att_data['content'])
-                        except Exception:
+                        except Exception as decode_error:  # 修正：给异常一个具体的变量名
                             # 如果解码失败，保持content为None
-                            logging.debug(f"Failed to decode attachment content: {str(e)}")
+                            logging.debug(f"Failed to decode attachment content: {str(decode_error)}")
                             content = None
                     
                     attachment = EmailAttachment(
@@ -207,7 +207,7 @@ class FileBackend:
                 raise ValidationError(f"Missing required field in JSON: {str(e)}")
         
         # Sort emails by email_id in descending order
-        emails.sort(key=lambda email_obj: email_obj.email_id, reverse=True)
+        emails.sort(key=lambda email_obj: int(email_obj.email_id) if email_obj.email_id.isdigit() else 0, reverse=True)
         
         return emails
     
