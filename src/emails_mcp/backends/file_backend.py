@@ -1,8 +1,8 @@
 import json
-import email
 import os
+import base64
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List
 from datetime import datetime
 from ..models.email import EmailMessage
 from ..utils.exceptions import ValidationError
@@ -93,7 +93,7 @@ class FileBackend:
                 parsed_date = datetime(*parsed_date[:6])
             
             return parsed_date
-        except:
+        except Exception:
             # Fallback to current time if parsing fails (make it naive)
             return datetime.now().replace(tzinfo=None)
     
@@ -124,7 +124,8 @@ class FileBackend:
                     {
                         'filename': att.filename,
                         'content_type': att.content_type,
-                        'size': att.size
+                        'size': att.size,
+                        'content': base64.b64encode(att.content).decode('utf-8') if att.content else None
                     }
                     for att in email_obj.attachments
                 ]
@@ -166,10 +167,20 @@ class FileBackend:
                 
                 attachments = []
                 for att_data in email_data.get('attachments', []):
+                    # 解码附件内容（如果存在）
+                    content = None
+                    if att_data.get('content'):
+                        try:
+                            content = base64.b64decode(att_data['content'])
+                        except Exception:
+                            # 如果解码失败，保持content为None
+                            content = None
+                    
                     attachment = EmailAttachment(
                         filename=att_data['filename'],
                         content_type=att_data['content_type'],
-                        size=att_data['size']
+                        size=att_data['size'],
+                        content=content
                     )
                     attachments.append(attachment)
                 
@@ -195,7 +206,7 @@ class FileBackend:
                 raise ValidationError(f"Missing required field in JSON: {str(e)}")
         
         # Sort emails by email_id in descending order
-        emails.sort(key=lambda email: email.email_id, reverse=True)
+        emails.sort(key=lambda email_obj: email_obj.email_id, reverse=True)
         
         return emails
     

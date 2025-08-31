@@ -141,7 +141,8 @@ def extract_attachments_info(msg: email.message.Message) -> List[EmailAttachment
                 attachment = EmailAttachment(
                     filename=filename,
                     content_type=content_type,
-                    size=size
+                    size=size,
+                    content=payload  # 保存附件的实际内容
                 )
                 attachments.append(attachment)
     

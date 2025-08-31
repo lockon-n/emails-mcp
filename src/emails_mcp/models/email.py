@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import List, Optional, Any
 
 
 @dataclass
@@ -10,6 +9,7 @@ class EmailAttachment:
     content_type: str
     size: int
     attachment_id: Optional[str] = None
+    content: Optional[bytes] = None  # 附件的实际内容数据
 
 
 @dataclass
