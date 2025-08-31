@@ -302,7 +302,7 @@ def register_management_tools(mcp: FastMCP, draft_service: DraftService, email_s
         """Import emails from backup file to IMAP server
         
         Args:
-            import_path: Path to import file
+            import_path: Path to import file (.json or .eml) or a directory
             target_folder: Target folder for imported emails (if preserve_folders=False)
             preserve_folders: Whether to preserve original folder structure (default: True)
         """

@@ -61,8 +61,10 @@ class FileBackend:
             
             emails = []
             if import_file.suffix.lower() == '.json':
+                # logging.warning("Importing emails from JSON file")
                 emails = self._import_from_json(import_file)
             elif import_file.suffix.lower() == '.eml':
+                # logging.warning("Importing emails from EML file")
                 emails = self._import_from_eml(import_file)
             elif import_file.is_dir():
                 emails = self._import_from_directory(import_file)
@@ -185,6 +187,8 @@ class FileBackend:
                     )
                     attachments.append(attachment)
                 
+
+
                 email_obj = EmailMessage(
                     email_id=email_data['email_id'],
                     subject=email_data['subject'],
@@ -201,6 +205,70 @@ class FileBackend:
                     folder=email_data.get('folder'),
                     attachments=attachments
                 )
+                
+                # Only create raw_message if there are attachments (for attachment display support)
+                if email_data.get('attachments'):
+                    # Create a minimal email.message.Message object for JSON imports to support attachment display
+                    import email.message
+                    from email.mime.multipart import MIMEMultipart
+                    from email.mime.base import MIMEBase
+                    from email.mime.text import MIMEText
+                    import base64
+                    
+                    msg = MIMEMultipart()
+                    msg['Subject'] = email_data['subject']
+                    msg['From'] = email_data['from_addr']
+                    msg['To'] = email_data['to_addr']
+                    if email_data.get('cc_addr'):
+                        msg['Cc'] = email_data['cc_addr']
+                    if email_data.get('message_id'):
+                        msg['Message-ID'] = email_data['message_id']
+                    if email_data.get('date'):
+                        msg['Date'] = email_data['date']
+                    
+                    # Add text body if exists
+                    if email_data.get('body_text'):
+                        text_part = MIMEText(email_data['body_text'], 'plain', 'utf-8')
+                        msg.attach(text_part)
+                    
+                    # Add HTML body if exists
+                    if email_data.get('body_html'):
+                        html_part = MIMEText(email_data['body_html'], 'html', 'utf-8')
+                        msg.attach(html_part)
+                    
+                    # Add attachments to the message object
+                    for att_data in email_data.get('attachments', []):
+                        if att_data.get('content'):
+                            part = MIMEBase('application', 'octet-stream')
+                            try:
+                                # Decode base64 content for the message part
+                                content = base64.b64decode(att_data['content'])
+                                part.set_payload(content)
+                            except:
+                                # If decoding fails, use empty content
+                                part.set_payload(b'')
+                            
+                            # Handle Chinese filename encoding
+                            filename = att_data["filename"]
+                            from email.header import Header
+                            # Encode Chinese filename properly for MIME
+                            try:
+                                # Check if filename contains non-ASCII characters
+                                filename.encode('ascii')
+                                # If it's ASCII, use directly
+                                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+                            except UnicodeEncodeError:
+                                # If it contains non-ASCII, encode it
+                                encoded_filename = Header(filename, 'utf-8').encode()
+                                part.add_header('Content-Disposition', f'attachment; filename={encoded_filename}')
+                            part.add_header('Content-Type', att_data['content_type'])
+                            msg.attach(part)
+                    
+                    email_obj.raw_message = msg
+                else:
+                    # No attachments, no need for raw_message
+                    email_obj.raw_message = None
+                
                 emails.append(email_obj)
                 
             except KeyError as e:
@@ -209,6 +277,11 @@ class FileBackend:
         # Sort emails by email_id in descending order
         emails.sort(key=lambda email_obj: int(email_obj.email_id) if email_obj.email_id.isdigit() else 0, reverse=True)
         
+        # import pickle
+        # os.makedirs("./json", exist_ok=True)
+        # with open("./json/all.pkl", "wb") as f:
+        #     pickle.dump(emails, f)
+
         return emails
     
     def _import_from_eml(self, import_file: Path) -> List[EmailMessage]:
@@ -218,6 +291,10 @@ class FileBackend:
         
         email_id = import_file.stem
         email_obj = parse_raw_email(raw_email, email_id)
+        # import pickle
+        # os.makedirs("./eml", exist_ok=True)
+        # with open("./eml/all.pkl", "wb") as f:
+        #     pickle.dump([email_obj], f)
         return [email_obj]
     
     def _import_from_directory(self, import_dir: Path) -> List[EmailMessage]:
