@@ -194,6 +194,9 @@ class FileBackend:
             except KeyError as e:
                 raise ValidationError(f"Missing required field in JSON: {str(e)}")
         
+        # Sort emails by email_id in ascending order
+        emails.sort(key=lambda email: email.email_id)
+        
         return emails
     
     def _import_from_eml(self, import_file: Path) -> List[EmailMessage]:
