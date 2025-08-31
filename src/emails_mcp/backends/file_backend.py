@@ -8,7 +8,7 @@ from ..models.email import EmailMessage
 from ..utils.exceptions import ValidationError
 from ..utils.validators import validate_file_path
 from ..utils.email_parser import parse_raw_email
-
+import logging
 
 class FileBackend:
     """File backend for email import/export operations"""
@@ -174,6 +174,7 @@ class FileBackend:
                             content = base64.b64decode(att_data['content'])
                         except Exception:
                             # 如果解码失败，保持content为None
+                            logging.debug(f"Failed to decode attachment content: {str(e)}")
                             content = None
                     
                     attachment = EmailAttachment(
